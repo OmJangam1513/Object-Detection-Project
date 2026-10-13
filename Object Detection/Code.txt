@@ -1,0 +1,103 @@
+import torch
+from torchvision.models.detection import fasterrcnn_resnet50_fpn
+from torchvision import transforms
+from PIL import Image
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+import cv2
+import os
+import random
+
+
+
+COCO_INSTANCE_CATEGORY_NAMES = [
+    '__background__', 'person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus',
+    'train', 'truck', 'boat', 'traffic light', 'fire hydrant', 'stop sign',
+    'parking meter', 'bench', 'bird', 'cat', 'dog', 'horse', 'sheep', 'cow',
+    'elephant', 'bear', 'zebra', 'giraffe', 'backpack', 'umbrella', 'handbag',
+    'tie', 'suitcase', 'frisbee', 'skis', 'snowboard', 'sports ball', 'kite',
+    'baseball bat', 'baseball glove', 'skateboard', 'surfboard', 'tennis racket',
+    'bottle', 'wine glass', 'cup', 'fork', 'knife', 'spoon', 'bowl', 'banana',
+    'apple', 'sandwich', 'orange', 'broccoli', 'carrot', 'hot dog', 'pizza',
+    'donut', 'cake', 'chair', 'couch', 'potted plant', 'bed', 'dining table',
+    'toilet', 'tv', 'laptop', 'mouse', 'remote', 'keyboard', 'cell phone',
+    'microwave', 'oven', 'toaster', 'sink', 'refrigerator', 'book', 'clock',
+    'vase', 'scissors', 'teddy bear', 'hair drier', 'toothbrush'
+]
+
+
+
+
+
+
+
+# Load pretrained Faster R-CNN
+model = fasterrcnn_resnet50_fpn(pretrained=True)
+model.eval()
+
+# Use CPU (or GPU if available)
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+model.to(device)
+
+
+
+
+
+# Change this to your folder path
+image_folder = r"C:\Users\Administrator\Desktop\Object Detection\CocoaImages"
+
+# Get all image files in the folder
+image_files = [f for f in os.listdir(image_folder) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+print(f"Found {len(image_files)} images.")
+
+
+
+
+
+
+
+def detect_and_display(image_path, threshold=0.5):
+    # Load image
+    image = Image.open(image_path).convert("RGB")
+    
+    # Transform to tensor
+    transform = transforms.Compose([transforms.ToTensor()])
+    image_tensor = transform(image).to(device)
+    
+    # Run detection
+    with torch.no_grad():
+        outputs = model([image_tensor])
+    
+    outputs = outputs[0]
+    boxes = outputs['boxes'].cpu().numpy()
+    scores = outputs['scores'].cpu().numpy()
+    labels = outputs['labels'].cpu().numpy()
+    
+    # Convert image to numpy for matplotlib
+    img_np = cv2.cvtColor(cv2.imread(image_path), cv2.COLOR_BGR2RGB)
+    
+    # Display
+    fig, ax = plt.subplots(1, figsize=(12, 8))
+    ax.imshow(img_np)
+    
+    for box, score, label in zip(boxes, scores, labels):
+        if score > threshold:
+            x1, y1, x2, y2 = box
+            rect = patches.Rectangle((x1, y1), x2-x1, y2-y1,
+                                     linewidth=2, edgecolor='r', facecolor='none')
+            ax.add_patch(rect)
+            ax.text(x1, y1-5, f"{COCO_INSTANCE_CATEGORY_NAMES[label]}: {score:.2f}",
+                    color='yellow', fontsize=12, weight='bold')
+    
+    plt.axis('off')
+    plt.show()
+
+
+# Pick a random image
+random_image = random.choice(image_files)
+image_path = os.path.join(image_folder, random_image)
+print("Processing:", random_image)
+
+# Detect and display
+detect_and_display(image_path)
+
